@@ -202,10 +202,3 @@ Ardından harf harf yazılan kapanış cümlesi.
 Renk paleti bilerek soğuk ve kasvetli tutuldu — sıcak bir gün doğumu yerine soluk,
 yeşilimsi bir alacakaranlık.
 
----
-
-## Başarımlar
-
-Oyun `window.parent.postMessage` ile üç başarım bildiriyor: ilk ölüm, kaçış, ve
-5 dakikanın altında kaçış. Bir portal sayfasına `<iframe>` ile gömülmek için
-tasarlandı; tek başına açıldığında mesajlar sessizce yok sayılıyor.

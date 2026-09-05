@@ -127,10 +127,6 @@ Bir de **yönetmen AI'ı** var: (25 − anahtar×2) saniyedir karşılaşma olma
 
 İki sekme aynı tarayıcıda açık olmalı — `BroadcastChannel` ağ üzerinden çalışmaz.
 
-### 🏆 Başarımlar
-
-Oyun `window.parent.postMessage` ile üç başarım gönderiyor: **ilk ölüm**, **kaçış**, ve **5 dakikanın altında kaçış**. Bu bir portal sayfasına `<iframe>` ile gömülmek için tasarlanmış — tek başına açıldığında mesajlar sessizce yok sayılıyor, oyun normal çalışıyor.
-
 ## Kontroller
 
 | Tuş | İşlev |
@@ -314,10 +310,6 @@ There's also a **director AI**: if (25 − keys×2) seconds pass without an enco
 `entity.html` is a green-phosphor CRT-style observation screen you open in a second tab. It receives live data from the game tab over `BroadcastChannel('telemetry-hub')`: the Entity's position, state, neck and arm angles, light colour; your position, stamina and flashlight; every door's open/closed state; the coordinates of the remaining keys; the exit's location. A 2D radar sits at the bottom, a status panel at the top.
 
 Both tabs must be in the same browser — `BroadcastChannel` does not cross the network.
-
-### 🏆 Achievements
-
-The game emits three achievements via `window.parent.postMessage`: **first death**, **escape**, and **escape under 5 minutes**. This is built to be embedded in a portal page via `<iframe>` — opened standalone the messages are silently ignored and the game runs normally.
 
 ## Controls
 
