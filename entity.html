@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entity Monitor - Gözlem Odası</title>
+    <style>
+        body { margin: 0; background: #000; color: #0f0; font-family: 'Courier New', monospace; overflow: hidden; }
+        #monitor-canvas { display: block; width: 100vw; height: 100vh; filter: contrast(1.2) brightness(1.1) hue-rotate(-5deg); }
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            background: linear-gradient(rgba(0, 50, 0, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+            background-size: 100% 4px;
+            z-index: 10;
+            opacity: 0.5;
+        }
+        #ui-panel {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0, 10, 0, 0.85); border: 2px solid #0f0;
+            padding: 15px; z-index: 20; box-shadow: 0 0 15px #0f0;
+        }
+        #radar-container {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 400px; height: 350px;
+            background: rgba(0, 10, 0, 0.9); border: 3px solid #0f0;
+            z-index: 20; overflow: hidden; box-shadow: 0 0 20px #0f0;
+        }
+        #radar-canvas { width: 100%; height: 100%; }
+        .glitch-text { animation: blink 1s infinite steps(1); }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } }
+        #status { font-weight: bold; font-size: 1.2em; border-bottom: 1px solid #0f0; margin-bottom: 5px; padding-bottom: 5px; }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./js/three.module.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="overlay"></div>
+    <canvas id="monitor-canvas"></canvas>
+    
+    <div id="ui-panel">
+        <div id="status" class="glitch-text">SİSTEM: AKTİF</div>
+        <div>ENTITY POV: LIVE_FEED</div>
+        <div id="entity-state">DURUM: BEKLENİYOR...</div>
+        <div id="entity-pos">POS: 0, 0, 0</div>
+        <div id="player-dist">MESAFE: ---</div>
+        <div id="fake-entity-state">SAHTE ENTITY: YOK</div>
+    </div>
+
+    <div id="radar-container">
+        <canvas id="radar-canvas"></canvas>
+    </div>
+
+    <script type="module" src="entity_logic.js"></script>
+</body>
+</html>

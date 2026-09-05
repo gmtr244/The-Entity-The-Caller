@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entities: The Caller (V7)</title>
+    <link rel="icon" type="image/png" href="scare.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Sinematik Intro Overlay -->
+    <div id="cinematic-overlay" style="display:none;">
+        <p id="cinematic-text"></p>
+    </div>
+
+    <!-- Görsel Efekt Katmanları -->
+    <div id="fade-to-black-screen"></div>
+    <div id="fade-to-white-screen"></div>
+    <div id="sanity-vignette"></div>
+    <div id="jumpscare-container">
+        <img id="jumpscare-image" src="scare.png" alt="Jumpscare">
+    </div>
+
+    <!-- UI Ekranları -->
+    <div id="loading-screen">
+        <h1>YÜKLENİYOR...</h1>
+    </div>
+
+    <div id="start-screen">
+        <div id="main-menu-content">
+            <h2 class="glitch" data-text="Entities: The Caller">Entities: The Caller</h2>
+            <p class="start-subtitle">V7 · HORROR EDITION</p>
+            <div id="start-controls-info">
+                <span>WASD · Hareket</span><span class="ctrl-sep">|</span><span>E · Kapı/Eşya</span><span class="ctrl-sep">|</span><span>G · Fırlat</span><br>
+                <span>SHIFT · Koş</span><span class="ctrl-sep">|</span><span>F · Fener</span><span class="ctrl-sep">|</span><span>8 Anahtarı Topla &amp; Kaç</span>
+            </div>
+            <div id="main-menu-buttons">
+                <button class="menu-btn" id="start-button">BAŞLA</button>
+                <button class="menu-btn" id="settings-button">AYARLAR</button>
+            </div>
+        </div>
+        <div id="settings-panel">
+            <p class="settings-title">— AYARLAR —</p>
+            <div class="setting-row">
+                <label>MÜZİK</label>
+                <input type="range" id="vol-music" min="0" max="100" value="30">
+                <span id="vol-music-val">30%</span>
+            </div>
+            <div class="setting-row">
+                <label>EFEKT SESLERİ</label>
+                <input type="range" id="vol-sfx" min="0" max="100" value="80">
+                <span id="vol-sfx-val">80%</span>
+            </div>
+            <button class="menu-btn" id="settings-back">← GERİ</button>
+        </div>
+    </div>
+
+    <div id="pause-screen">
+        <h1 id="pause-title">— DURAKLATILDI —</h1>
+        <div id="pause-controls-hint">
+            <span>WASD · Hareket</span><span class="ctrl-sep">|</span><span>E · Etkileşim</span><span class="ctrl-sep">|</span><span>G · Fırlat</span><br>
+            <span>SHIFT · Koş</span><span class="ctrl-sep">|</span><span>F · Fener</span>
+        </div>
+        <p id="pause-resume-hint">Devam etmek için tıkla</p>
+    </div>
+
+    <div id="game-over-screen">
+        <div id="death-cinematic">
+            <div id="entity-display">
+                <div id="entity-eyes"></div>
+            </div>
+            <div id="death-hint">
+                <p id="hint-text"></p>
+                <button class="restart-button" id="death-restart-button">Tekrar Dene</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="win-screen">
+        <div id="win-background"></div>
+        <div id="win-cinematic">
+            <h1 id="win-title"></h1>
+            <p id="win-message"></p>
+            <button class="restart-button" id="win-restart-button">Yeniden Oyna</button>
+        </div>
+    </div>
+    
+    <!-- Oyun İçi HUD (Arayüz) -->
+    <div id="escape-message">ÇIKIŞ MÜHÜRLENDİ! YENİ YOLU BUL!</div>
+    <div id="countdown-timer">15</div>
+    <div id="objective-marker" class="objective-marker-hidden"></div>
+    
+    <canvas id="game-canvas"></canvas>
+    
+    <!-- YENİ: Nişangah -->
+    <div class="crosshair"></div>
+
+    <div id="stamina-container">
+        <span id="stamina-label">KOŞU</span>
+        <div id="stamina-track">
+            <div id="stamina-bar"></div>
+        </div>
+    </div>
+
+    <div id="key-counter">
+        <span id="key-label">ANAHTAR</span>
+        <span id="key-count-text">0 / 8</span>
+    </div>
+    
+    <div id="flashlight-stun-container">
+        <div id="flashlight-stun-bar"></div>
+    </div>
+    
+    <div id="interaction-hint">[E] Etkileşim</div>
+
+    <div id="inventory-ui">
+        <div class="inventory-slot" id="slot-1">
+            <span class="slot-number">1</span>
+            <span class="slot-item"></span>
+        </div>
+        <div class="inventory-slot" id="slot-2">
+            <span class="slot-number">2</span>
+            <span class="slot-item"></span>
+        </div>
+        <div class="inventory-slot" id="slot-3">
+            <span class="slot-number">3</span>
+            <span class="slot-item"></span>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./js/three.module.js",
+            "PointerLockControls": "./js/PointerLockControls.js"
+        }
+    }
+    </script>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
