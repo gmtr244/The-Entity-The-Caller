@@ -1,164 +1,348 @@
 # Entity AI — Sistem Dokümantasyonu
-## script.js · labirentV7_Remade
+
+`script.js` · Entities: The Caller (V7 Remade)
+
+Bu belge Entity'nin yapay zekâsını satır düzeyinde anlatır. Oyunun genel tanıtımı ve
+kurulumu için [`README.md`](README.md)'ye bak.
 
 ---
 
 ## 1. DURUM MAKİNESİ
 
-Entity aşağıdaki 6 durumda olabilir:
+Entity beş durumdan birinde bulunur. Buna ek olarak duruma bağlı olmayan bir
+**sersemleme (stun)** bayrağı vardır — hangi durumda olursa olsun onu dondurur.
 
-| Durum        | Tetikleyici                                 | Davranış                                              |
-|--------------|---------------------------------------------|-------------------------------------------------------|
-| PATROLLING   | Varsayılan / arama bitti                    | Rastgele walkable tile'lara yürür                     |
-| HUNTING      | `canEnemySeePlayer() = true`               | Oyuncuya/tahmin noktasına koşar, kol öne uzanır       |
-| SEARCHING    | HUNTING → oyuncu kaçtı                      | Son bilinen konuma gider, kafa sol-sağ tarar          |
-| AMBUSH       | Rastgele + yakın + oyuncu bakmıyor          | Dondurur, yaklaşınca/görünce HUNTING                  |
-| FROZEN       | Tüm anahtarlar toplandı                     | Titreşerek yerinde kalır, saldıramaz                  |
-| STUNNED      | Feneri yüzüne tutma (flaş)                 | Kısa süre donar, mavi gözler                          |
+| Durum | Tetikleyici | Davranış | Işık |
+|-------|-------------|----------|------|
+| `PATROLLING` | Varsayılan / arama bitti | Rastgele bir walkable kareye yürür | Beyaz, 1.6 |
+| `HUNTING` | `canEnemySeePlayer() === true` | Oyuncuya/tahmin noktasına koşar, kollar öne uzanır | Kırmızı, 3.0–5.5 titrek |
+| `SEARCHING` | HUNTING → oyuncu kaçtı | Üç aşamalı arama, kafa tarar | Turuncu, 2.5 |
+| `AMBUSH` | Rastgele + yakın + oyuncu bakmıyor | Görünmez kalır, bakılmıyorken atılır | Kapalı |
+| `FROZEN` | Tüm anahtarlar toplandı | Titreyerek yerinde durur, saldıramaz | — |
 
----
-
-## 2. FONKSİYONLAR
-
-### `canEnemySeePlayer(isSprinting)` — satır 1911
-Entity'nin oyuncuyu görmesini 3 adımda hesaplar:
-1. **Mesafe kontrolü**: Algılama yarıçapı + öğrenme bonusu + sprint bonusu
-2. **Görüş açısı**: `forward = +Z direction` (quaternion'dan). Dot < 0.3 ve dist > 3m → görmez
-3. **Raycast**: Duvar/kapı engeli var mı
-
-**KRİTİK NOT (2026-06-16 düzeltmesi)**: Three.js'te **Group/Object3D** `lookAt()`
-KAMERADAN FARKLI çalışır — kaynak `Object3D.lookAt` içinde non-camera için
-argümanlar ters verilir (`_m1.lookAt(_target, _position, up)`), bu da **yerel +Z
-eksenini doğrudan hedefe** çevirir. Modelin yüzü/gözleri/ışığı +Z'de olduğu için
-düz `lookAt(oyuncu)` zaten yüzü oyuncuya döndürür — **flip GEREKMEZ.**
-Önceki sürümde her lookAt'tan sonra eklenen `rotation.y += Math.PI` tam tersini
-yapıyordu: yüzü oyuncudan 180° ters çeviriyordu → `forward(+Z)` uzağa bakıyor →
-`dot < 0` → entity oyuncuyu **göremiyor/kovalayamıyordu** + sinematikte sırtını
-dönüyordu. 3 flip de kaldırıldı (V7 davranışı). ✅
-
-### `senseRadius` — altıncı his (2026-06-16 eklendi)
-Görüş konisinin (FOV) DIŞINDA bile, oyuncu `senseRadius` (varsayılan 7m, sprint
-+4m, çömelme ×0.6) içindeyse ve aralarında duvar yoksa entity oyuncuyu **hisseder**
-→ dönüp kovalar. "Arkasına geçtiğimde beni fark etsin" davranışı.
-
-### `isPlayerLookingAtEnemy(playerPos)` — satır 1950
-Oyuncu entity'ye feneriyle bakıyor mu?
-- Camera world direction vs entity direction
-- dot > 0.8 (~37° koni)
-- Raycast ile duvar engeli kontrolü
-
-### `updateTheEntity(delta, playerPos, oldPlayerPos)` — satır 1967
-Ana AI döngüsü, her frame çağrılır.
-
-**Akış sırası:**
-1. `cinematicPlaying` → erken çıkış (satır 1968)
-2. `STUNNED` kontrolü (satır 1980)
-3. `FROZEN` kontrolü + pozisyon kilidi (satır 1988)
-4. `gameIntro.active` → eski intro bloğu (satır 2003) ← lookAt + PI fix eklendi (satır 2030)
-5. VHS glitch yakınlık efekti (satır 2034)
-6. Görünürlük/ışınlama yönetimi (satır 2040)
-7. `canEnemySeePlayer` → HUNTING / SEARCHING geçişi (satır 2136)
-8. AMBUSH tetikleyici (satır 2159) — `Math.random() < 0.01` / frame
-9. Hedef ve hız seçimi per-state (satır 2164)
-10. A* pathfinding hareketi + kapı açma (satır 2194)
-11. `lookAt(target)` + `rotation.y += Math.PI` (satır 2224–2225) ← yön düzeltmesi
-12. Kafa takibi / boyun pivot (satır 2228)
-13. Göz rengi & yoğunluk (satır 2249)
-14. Kol animasyonu (satır 2263)
-
-### `setEntityVisibility(isVisible, playAudio)` — satır 1116
-Entity görünür↔görünmez geçişi.
-- `the_entity.mesh.visible = isVisible` → tüm mesh + eyeLight birlikte
-- `visibilityTimer` resetlenir
-- Ses: görünür → giggle, görünmez → tenseMusic
-
-### `setNewPatrolTarget()` — aranacak
-Rastgele walkable tile seçer, `PATROLLING` moduna geçer.
-
-### `entityGetNextWaypoint(from, to, delta)` — önceki oturumlarda yazıldı
-A* pathfinding. 2D grid üzerinde çalışır, düzleştirilmiş waypoint listesi döner.
+**Sersemleme:** `isStunned` bayrağı. Işık maviye (`0x00ffff`) döner, `updateTheEntity`
+erken çıkar. İki yoldan tetiklenir — fener (3.5 sn) veya doğrudan şişe isabeti (6 sn).
 
 ---
 
-## 3. KAFA TAKİBİ (neckPivot) — satır 2228
+## 2. ALGI
 
-Gövde yönünü ayrı hesaplayan ayrı pivot. Gövde hedefe bakarken kafa oyuncuyu kırk-beş dereceye kadar takip eder.
+### `canEnemySeePlayer(isSprinting)` — satır 2142
 
-| Durum       | Kafa hareketi                         |
-|-------------|---------------------------------------|
-| HUNTING     | Oyuncuya bak, ±65° sınır, lerp hız 6 |
-| SEARCHING   | Sin dalgası ±55°, yavaş              |
-| PATROLLING  | Hafif sallama ±10°                   |
+Üç aşamalı kontrol; herhangi biri başarısız olursa `false` döner.
 
-**Formula** (satır 2235):
+**1. Mesafe**
+
 ```
-rel = atan2(player_dx, player_dz) - bodyYaw
+yarıçap = (temel + öğrenmeBonusu + koşuAlışkanlığıBonusu) × çömelmeÇarpanı
 ```
-PI flip'ten sonra `bodyYaw = atan2(target_dx, target_dz)` → formula doğru çalışır.
+
+| Bileşen | Değer |
+|---------|-------|
+| temel | 20 (yürürken) · 35 (koşarken) |
+| öğrenmeBonusu | `entityMemory.score × 0.5` → en fazla +5 |
+| koşuAlışkanlığıBonusu | Koşuyorsa **ve** karelerin >%25'inde koştuysa +6 |
+| çömelmeÇarpanı | 0.6 (çömelirken) · 1.0 |
+
+**2. Görüş konisi + altıncı his**
+
+Ön vektör quaternion'dan alınır: `(0,0,1).applyQuaternion(mesh.quaternion)`.
+`dot < 0.3` (~145° koni) ise oyuncu koninin dışındadır — ama hemen elenmez:
+
+```js
+senseRadius = (7 + (koşuyorsa 4 : 0)) × çömelmeÇarpanı
+if (dot < 0.3 && mesafe² > senseRadius²) return false;
+```
+
+Yani koninin **dışında** olsan bile `senseRadius` içindeysen ve arada duvar yoksa
+Entity seni hisseder ve döner. Arkasından sessizce geçmeyi engelleyen davranış budur.
+
+**3. Görüş hattı**
+
+Duvarlara ve **kapalı** kapılara raycast. Açık kapılar listeye alınmaz, yani
+açık bir kapının içinden görebilir.
+
+### `isPlayerLookingAtEnemy(playerPos)` — satır 2212
+
+Oyuncu Entity'ye bakıyor mu? Görünmez Entity için her zaman `false` döner.
+Menzil `flashlight.distance + 5`. Asıl karşılaştırmayı `isPlayerLookingAtPoint`
+yapar: `dot > 0.8` (~37° koni) + duvar raycast'i.
+
+`isPlayerLookingAtPoint` ortak bir yardımcıdır — AMBUSH giriş şartı, AMBUSH iç
+kontrolü ve bu fonksiyon aynı tanımı paylaşır, böylece "bakıyor mu" her yerde
+aynı anlama gelir.
+
+### `updateSmoothedLook(obj, rawValue, delta)` — histerezis
+
+Koni sınırındaki kamera titreşimlerinin tek karede durum değiştirmesini engeller.
+Ham değer `LOOK_FLIP_GRACE` (0.18 sn) boyunca sabit kalmadıkça kabul edilmez.
+Hem AMBUSH hem sahte Entity bunu kullanır — sahte Entity'nin 5 saniyelik sayacının
+bir karelik titremeyle sıfırlanmaması için şart.
 
 ---
 
-## 4. GÖZ / IŞIK SİSTEMİ
+## 3. ÖĞRENEN HAFIZA
 
-**2026-06-16: Ayrı göz mesh'leri KALDIRILDI** (V7 tarzı sade kafa seçildi). Kafa artık
-düz soluk küre (`SphereGeometry(0.4)`, `0xcccccc`). Tehdit/renk tamamen yukarıdaki
-`eyeLight` (tepe ışığı) ile veriliyor — aşağıdaki tablo o ışığın durum renklerini gösterir.
+`entityMemory` her karede güncellenir ve oyuncuyu profilleyerek 0–10 arası bir
+**skor** üretir:
 
-### eyeLight (SpotLight) — satır 245 · **V7 tarzı, 2026-06-16'da geri getirildi**
-Artık öne bakan "far" DEĞİL — **kafanın üstünden aşağı gövdeye vuran** moody ışık (V6/V7 hissi).
-- Pozisyon: `(0, 2.8, 0.35)` — kafanın üstü
-- Hedef: `(0, 0.6, 0.05)` — aşağı, gövdeye doğru
-- **enemyGroup'un** child'ı (kafanın değil) → kafa tarama hareketiyle sallanmaz
-- Parlaklık duruma göre: av=3–5.5 titreşim · arama=2.5 · devriye=1.6 · pusu=0.35 · sersem=2
-- Renk duruma göre: av=kırmızı · arama=turuncu · devriye=beyaz · pusu=koyu kırmızı · sersem=mavi
+```js
+score = min(10, floor(huntCount / 1.5))
+```
 
-### AI zekâ iyileştirmeleri (2026-06-16)
-- **Altıncı his** (`senseRadius`): arkadan/yandan yaklaşmayı hisseder → dönüp kovalar
-- **Av ısrarı** (`huntGrace` 1.2sn): köşeye saklanınca anında kaybetmez
-- **İz sürme**: arama hedefi = son görülen konum + kaçış yönünde +5 birim
-- **Önünü kesme**: `score≥2`'den itibaren oyuncunun gideceği yeri tahmin eder
-- **`chaseDuration` sıfırlanır**: av bitince hız sıfırlanır (sonsuz hızlanma bug'ı giderildi)
-- **Pusu** kare-bağımsız (`0.3*delta`) — eski `0.01/kare` çok sık donduruyordu
+`huntCount`, oyuncunun elinden kaçtığı av sayısıdır (`onHuntEnded`).
 
----
+| Alan | Örnekleme | Kullanımı |
+|------|-----------|-----------|
+| `heatmap` | 1.5 sn'de bir mevcut kare | `getMemoryHotSpot()` → devriye hedefi |
+| `posHistory` | 0.3 sn'de bir konum, son 30 | `getPredictedPlayerPos()` → önünü kesme |
+| `escapedDirs` | Av bitince, son 5 | Arama yönü |
+| `profile.sprintFrames` | Her kare | Koşu alışkanlığı bonusu |
+| `profile.bottlesThrown` | Her fırlatma | Yem yoksayma ihtimali |
 
-## 5. SİNEMATİK AKIŞI — satır 1310
+### Skorun beş etkisi
 
-| Zaman (s) | Olay |
-|-----------|------|
-| 0 → 10    | Metin (4 satır × 2.5s), karanlık |
-| 10 → 11.5 | Overlay fade-out |
-| 11.5 → 16 | Oyuncu karanlıkta sağ-sol bakar |
-| 16 → 16.6 | Fener çakmaya çalışıyor (flicker) |
-| 16.6 → 18 | Fener tamamen söndü, karanlık |
-| 16.8 → 18.5 | Oyuncu 180° arkasına döner |
-| t = 18    | Entity arkada belirir + **fener + entity ışığı açılır** |
-| Entity koşar | eyeLight pulse (kırmızı), fener 1.5 |
-| dist < 3.5 | Entity kaybolur → **fener söner** |
-| +0.5s     | `_endCinematic` → **fener tekrar açılır**, HUD görünür |
+| Etki | Formül |
+|------|--------|
+| Algılama yarıçapı | `+0.5 × score` |
+| Av ısrarı (`huntGrace`) | `1.2 + 0.1 × score` sn |
+| Hot spot'a gitme ihtimali | `0.07 × score`, en fazla %70 |
+| Sahte Entity bekleme süresi | `−1.5 × score` sn |
+| Önünü kesme | `score >= 2` olunca devreye girer |
+
+### `getPredictedPlayerPos(playerPos)`
+
+Pozisyon geçmişinden hız çıkarır, 2.8 kat ileriye projeksiyon yapar ve labirent
+sınırlarına kırpar. `score >= 2` iken HUNTING hedefi oyuncunun kendisi değil, bu
+tahmin noktasıdır.
 
 ---
 
-## 6. DÜZELTILEN SORUNLAR
+## 4. YOL BULMA
 
-| # | Sorun | Sebep | Düzeltme | Satır |
-|---|-------|-------|----------|-------|
-| 1 | ~~Entity oyuncuya bakamıyor~~ → **PI flip'in kendisi bug'mış** | Group.lookAt zaten +Z'yi hedefe çevirir; eklenen `rotation.y += Math.PI` yüzü TERS çevirdi → göremiyor/kovalamıyor | 3 flip de KALDIRILDI (gövde, intro, sinematik) | 2242, 2046, 1427 |
-| 2 | Sinematikte entity gelio ama bakmıo | Aynı PI flip sinematik koşu bloğunda | Flip kaldırıldı → oyuncuya dönük gelir (fenerle yüzü görülür) | 1427 |
-| 3 | Arkadan yaklaşınca fark etmiyor | FOV dışı sadece <3m hissediyordu | `senseRadius` (7m, sprint+4, çömelme×0.6) + LOS | 1937 |
-| 4 | Spotlight entity'nin arkasına vuruyordu | Target -Z yönündeydi | Position `(0,0.05,0.15)`, target `(0,-0.3,8)` | 245-246 |
-| 5 | Kafa başta siyah görünüyordu | Sadece color, emissive yoktu, ortam ışığı çok az | `emissive: 0x444444, emissiveIntensity: 0.06` | 229 |
-| 6 | Sinematik entity ışığı kapalıydı | `updateTheEntity` sinematik sırasında çalışmıyor | entity belirlince `eyeLight.intensity = 5` | ~1391 |
-| 7 | Sinematik fener zamanlaması yanlış | Fener t=11.5'te açılıyordu | Entity gelirken açılır, kaybolunca kapanır | ~1341 |
-| 8 | Tüm input sinematik sırasında bloke değildi | keydown/keyup handler'ları filtre yoktu | `if (cinematicPlaying) return;` eklendi | 713,722 |
-| 9 | Fare sinematik sırasında kamerayı oynatıyordu | `PointerLockControls.js` `enabled` kontrolü yoktu | `onMouseMove`'a `if (!scope.enabled) return` | PLControls:42 |
+### `findPathAStar(fromWorld, toWorld)` — satır 2008
+
+2B ızgara üzerinde A\*. Dört yönlü komşuluk, Manhattan sezgiseli, **350 iterasyon**
+üst sınırı. Hedef kare duvarsa `_pfNearestWalkable()` onu en yakın yürünebilir
+kareye yapıştırır (en fazla 6 halka tarar). Yol bulunamazsa `null` döner ve çağıran
+taraf hedefe doğru düz yürümeyi dener — Entity asla tamamen donmaz.
+
+### `entityGetNextWaypoint(from, to, delta, pf, playStuckSound)` — satır 2067
+
+Gerçek ve sahte Entity aynı fonksiyonu kullanır; `pf` parametresi sayesinde her biri
+kendi bağımsız `path` / `waypointIdx` / `stuckTimer` durumunu taşır.
+
+**Yol yenileme:** hedef `wallSize × 1.5` kadar kaydıysa, yol boşsa veya 1.2 sn'lik
+sayaç dolduysa.
+
+**Takılma kurtarma:** 2 saniye boyunca **birikmiş** ilerleme 0.3 birimin altında
+kalırsa Entity, hedefe en yakın yürünebilir komşu kareye ışınlanır. Kare-kare
+karşılaştırma değil birikmiş mesafe ölçülür — normal devriye hızında (1.5 birim/sn)
+bir karede kat edilen mesafe zaten eşiğin altındadır. Işınlama rastgele değil hep
+hedefe doğrudur; aksi halde oyuncuya "geri gidiyor" hissi verir.
 
 ---
 
-## 7. BİLİNEN SORUNLAR / İZLEME
+## 5. DURUM DAVRANIŞLARI — `updateTheEntity()` satır 2248
 
-| Sorun | Detay |
+Akış sırası:
+
+1. `cinematicPlaying` → erken çıkış
+2. Öfke çarpanı: `1 + keysCollected × 0.07` (8 anahtarla ≈ %56 hız artışı)
+3. `isStunned` → ışık mavi, erken çıkış
+4. `FROZEN` → konum kilidi + titreme, erken çıkış
+5. VHS glitch: `mesafe < 5 && HUNTING && görünür` iken `body.glitch-active`
+6. Görünürlük / ışınlanma yönetimi
+7. `canEnemySeePlayer` → `enterHunting()` veya `huntGrace` sayacı
+8. AMBUSH tetikleyici
+9. Duruma göre hedef ve hız seçimi
+10. A\* hareketi + yol üstündeki kapıları açma
+11. Gövde dönüşü (`_lerpAngle`)
+12. Kafa takibi (`neckPivot`)
+13. Kol animasyonu
+
+### Görünürlük döngüsü
+
+Entity **60 saniye görünür**, **25 saniye görünmez** kalır (`timeVisible` /
+`timeInvisible`).
+
+**Görünürken:** normal hızda, kapıları açar, öldürebilir, koşulları uyarsa ışınlanır.
+
+**Görünmezken:** hız 2.0'a düşer, `phaseDoors` ile kapılardan geçer, **öldüremez**,
+ışınlanamaz. Yakınlığa göre tırmalama sesi çalar — 8 birim içinde her 2.0–3.5 sn'de,
+15 birim içinde 4.0–7.0 sn'de bir. Bu, konumunu kasıtlı olarak sızdırır.
+
+Görünür olmadan ~3 saniye önce bir kıkırdama çalar (`_preRevealSoundPlayed`) —
+oyuncuya "bir şey geliyor" uyarısı.
+
+**Ortaya çıkma erteleme:** oyuncu o yöne bakıyorsa veya 4 birimden yakınsa ortaya
+çıkış ertelenir — ama en fazla **4 kez** (`_revealStallCount`). Sınır olmasaydı
+oyuncu sadece o yöne bakmaya devam ederek ortaya çıkışı sonsuza dek erteleyebilirdi.
+
+### Yönetmen AI'ı
+
+```js
+directorWantsTeleport = timeSinceLastEncounter > (25 - keysCollected × 2)
+```
+
+Uzun süre olay olmazsa Entity zorla oyuncunun 12–22 birim yakınına ışınlanır —
+ama yalnızca oyuncu ona bakmıyorken.
+
+### SEARCHING — üç aşamalı arama
+
+`lastKnownPlayerPosition` etrafında sırayla üç nokta:
+
+| Aşama | Hedef |
 |-------|-------|
-| AMBUSH çok sık | `Math.random() < 0.01` per frame → 60fps'de ~36x/dk. Delta ile normalize edilmeli: `Math.random() < 0.001 * delta * 60` |
-| gameIntro aktif değil | `gameIntro.active` hiçbir zaman `true` set edilmiyor (eski kod). Blok zararsız ama temizlenebilir |
-| Görünmezken entity konumu belli | Scratch sesi + proximity sounds entity'nin yaklaşık konumunu veriyor (intentional) |
+| 0 | Son bilinen konum |
+| 1 | Kaçış yönünde +5 birim |
+| 2 | Kaçış yönünde +10 birim |
+
+Hedefe 2.5 birim yaklaşınca **veya** aşamada 4 saniye geçince sıradakine atlar.
+Arama hızı `searchSpeed × öfke × 1.3`.
+
+### AMBUSH — weeping angel
+
+```js
+speed = oyuncuBakıyorsa ? 0 : huntSpeed × 2.3
+```
+
+Görünmez kalır. Oyuncu baktığı sürece **tamamen donar**; bakış kesildiği an normal
+av hızının 2.3 katıyla atılır. 3 birime yaklaşırsa aniden görünür olup `enterHunting()`
+çağırır. Giriş şartı: `mesafe < 10`, oyuncu bakmıyor, cooldown bitmiş,
+`Math.random() < 0.12 × delta` (kare-bağımsız, ~0.12/sn).
+
+Bir pusudan sonra **90 saniye** cooldown. 9 saniyede yakalayamazsa pusu bozulur.
+
+### `enterHunting(playerPos, opts)`
+
+HUNTING'e giren **her** yol bunu kullanmalıdır. `state`'i tek başına atamak
+`huntGrace` veya `lastKnownPlayerPosition` gibi alanları kurmayı atlar ve Entity
+bir sonraki karede sessizce SEARCHING'e geri düşer.
+
+---
+
+## 6. SAHTE ENTITY (HALLUCINATION)
+
+Gerçek Entity'nin yarı saydam (`opacity: 0.4`), yeşil ışıklı, yerden 1.6 birim
+yukarıda süzülen bir kopyası. Kafası `rotation.z = 0.15` ile hafif yatık.
+
+```
+WANDERING ──► DECTED ──5 sn kesintisiz bakış──► CHARGING ──► GLITCH ──► kaybolur
+```
+
+| Durum | Davranış |
+|-------|----------|
+| `WANDERING` | Gerçek Entity gibi A\* ile dolaşır (hız 1.5), yakın kapıları açar |
+| `DECTED` | Oyuncuya döner ve donar; `detectionTimer` işler |
+| `CHARGING` | Oyuncuya doğru uçar (hız 13.5); oyuncu tekrar bakarsa DECTED'e döner |
+| `GLITCH` | 5 saniye oyuncunun etrafında yörüngede döner, ekran bozulur |
+
+**Yakalama mantığı gerçek Entity'nin tersidir.** `FAKE_ENTITY_CAPTURE_DURATION`
+(5.0 sn) boyunca **kesintisiz bakılırsa** CHARGING'e geçer. Süre dolmadan bakış
+kesilirse oyuncu kazanır: sahte Entity oyuncudan 15–40 birim uzağa ışınlanıp
+WANDERING'e döner.
+
+**Sahte Entity oyuncuyu öldüremez.** GLITCH bittiğinde sahneden kaldırılır ve
+sayaç `25 + rastgele(20) − score × 1.5` saniyeye kurulur.
+
+### Entity kombosu
+
+Sahte Entity CHARGING durumundayken **ve** gerçek Entity HUNTING değilken, gerçek
+Entity de `chargeDirection` yönüne hamle yapar (hız `huntSpeed × 1.2`) ve ışığı
+turuncu-kırmızıya döner. AMBUSH bu kombodan muaftır — yoksa pusunun "bakınca don"
+mekaniğini ezerdi.
+
+Tüm anahtarlar toplandığında sahte Entity kalıcı olarak devre dışı bırakılır.
+
+---
+
+## 7. GÖRSEL SİSTEM
+
+### `eyeLight` — satır 257
+
+Kafanın **üstünden aşağı gövdeye** vuran spotlight. Öne bakan bir far değildir.
+`enemyGroup`'un child'ıdır (kafanın değil), böylece kafa tarama hareketiyle sallanmaz.
+
+- Pozisyon `(0, 2.8, 0.35)` · hedef `(0, 0.6, 0.05)`
+- Renk ve parlaklık duruma göre değişir (bkz. bölüm 1 tablosu)
+
+Ayrı göz mesh'i yoktur. Kafa düz soluk bir küredir (`SphereGeometry(0.4)`,
+`0xcccccc`, hafif emissive); tehdit hissinin tamamı bu ışıktan gelir.
+
+### Kafa takibi — `neckPivot`, satır 2595
+
+Gövdeden bağımsız dönen ayrı pivot. Gövde hedefe bakarken kafa ayrı davranır:
+
+| Durum | Hedef açı | Lerp hızı |
+|-------|-----------|-----------|
+| Görüyor | Oyuncuya kilit, ±0.7π (~±126°) sınır | 10 — "fark etti" hissi |
+| HUNTING, son bilinen konum | Aynı sınır | 5 |
+| SEARCHING | `sin(t × 0.0016) × 0.5π` (~±90°) | 3 |
+| PATROLLING | `sin(t × 0.0006) × 0.22` (~±13°) | 2 |
+
+Açı gövde yaw'ına **göreli** hesaplanır, sonra ±π aralığına sarmalanır.
+
+### Kol animasyonu — satır 2619
+
+Yürüyüş fazı rastgele değil, **gerçekten kat edilen mesafeyle** ilerler
+(`walkPhase += mesafe × 4.5`), böylece kollar adımlarla senkron kalır. Işınlanma
+sıçramasını sınırlamak için tek karelik mesafe 0.5 ile kırpılır.
+
+| Koşul | Poz |
+|-------|-----|
+| HUNTING/kombo **ve** mesafe < 6 | Kollar öne uzanır ve yana açılır, dirsekler bükük, hafif titrer |
+| HUNTING/kombo | Büyük genlikli hızlı pompalama (±0.6) |
+| Hareket ediyor | Ölçülü doğal sallanma (±0.32) |
+| Duruyor | Kollar yanlarda asılı, sakin |
+
+---
+
+## 8. AÇILIŞ SİNEMATİĞİ — `updateCinematic()` satır 1478
+
+Süre boyunca `controls.enabled = false`, klavye olayları da `cinematicPlaying`
+kontrolüyle bloke edilir.
+
+| Zaman (sn) | Olay |
+|------------|------|
+| 0 → 10 | Dört satır metin, her biri 2.5 sn, ekran karanlık |
+| 10 → 11.5 | Metin overlay'i solar |
+| 12.5 → 14 | Oyuncu sağa bakar |
+| 14 → 15.5 | Sola bakar |
+| 15.5 → 16 | Merkeze döner |
+| 16 → 16.6 | Fener çakmaya çalışır (rastgele flicker) |
+| 16.6 → 18 | Fener söner, tam karanlık |
+| 16.8 → 18.5 | Oyuncu 180° arkasını döner |
+| 18 | Entity 16 birim ötede belirir; fener ve `eyeLight` açılır |
+| — | Entity `huntSpeed × 1.6` ile koşar, ışığı kırmızı titrer |
+| mesafe < 3.5 | Entity kaybolur, fener söner, 25+ birim uzağa ışınlanır |
+| +0.5 sn | `_endCinematic()` — fener geri açılır, HUD görünür, hedef bildirimi çıkar |
+| 23 (emniyet) | Entity hiç gelmediyse zaman aşımı, sinematik yine de biter |
+
+---
+
+## 9. TELEMETRİ
+
+Her karede `BroadcastChannel('telemetry-hub')` üzerinden yayın yapılır. Alıcı
+`entity_logic.js` (gözlem ekranı).
+
+Gönderilen veri: Entity'nin konumu, rotasyonu, durumu, `walkPhase`, sersemleme
+bayrağı, boyun ve kol açıları, görünürlüğü, ışık rengi ve şiddeti · oyuncunun
+konumu, rotasyonu, koşma/çömelme durumu, feneri, aktif slotu, staminası · sahte
+Entity'nin konumu ve durumu (aktifse) · tüm kapıların açık/kapalı durumu ·
+toplanan anahtar sayısı ve kalan anahtarların koordinatları · çıkış kapısının
+konumu, kilit ve açıklık durumu.
+
+---
+
+## 10. THREE.JS NOTU — `Object3D.lookAt`
+
+Three.js'te **kamera dışı** nesnelerde `lookAt()` kameradakinden farklı çalışır:
+kaynak kodda non-camera dalı argümanları ters verir (`_m1.lookAt(_target, _position, up)`),
+bu da yerel **+Z** eksenini doğrudan hedefe çevirir.
+
+Entity modelinin yüzü, ışığı ve ön vektörü +Z üzerindedir. Dolayısıyla düz
+`lookAt(oyuncuKonumu)` çağrısı yüzü doğrudan oyuncuya döndürür — ek bir
+`rotation.y += Math.PI` düzeltmesi **gerekmez** ve eklenirse yüzü 180° ters
+çevirir. Bu, `canEnemySeePlayer` içindeki ön vektör hesabıyla doğrudan bağlantılıdır:
+`forward` yanlış yöne bakarsa `dot` negatif çıkar ve Entity oyuncuyu göremez.

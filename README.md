@@ -93,8 +93,6 @@ WANDERING ──► DECTED ──5 sn kesintisiz bakış──► CHARGING ─�
 
 **Önemli:** Sahte Entity seni **öldüremiyor.** En kötü ihtimalle GLITCH: 5 saniye etrafında dönüyor, ekran bozuluyor, çığlık çalıyor, sonra kayboluyor. Gerçek tehlike şu: sahte Entity üstüne uçarken **gerçek Entity de aynı yöne hamle yapıyor** ve ışığı turuncu-kırmızıya dönüyor. İki taraftan sıkışıyorsun.
 
-> ⚠️ `CHANGELOG.md` bu mekanizmayı ters anlatıyor (bakmayı bırakınca saldırdığını söylüyor). Kodda doğrusu yukarıdaki: **bakmak tetikliyor.**
-
 ### 🔦 Fener ve 🍾 Şişeler
 
 **Fener:** Entity'ye bakarken `F` tuşunu **basılı tut** — dairesel bir çubuk dolar. 2 saniyede dolunca Entity 3,5 saniye sersemler. Ama her kullanımda gereken süre **+0,5 saniye artıyor**, yani ikinci sefer 2,5 sn, üçüncü 3 sn... Sınırsız kullanılamıyor.
@@ -195,7 +193,7 @@ Her karakter 4×4 birimlik bir kare, duvarlar 5 birim yüksekliğinde.
 ├── style.css           # Arayüz, VHS/glitch efekt katmanları
 ├── entity.html         # Gözlem odası (ayrı sekme)
 ├── entity_logic.js     # Monitor 3B görünüm + radar
-├── js/                 # ⚠️ Kütüphaneler — çevrim dışı çalışsın diye repoda
+├── js/                 # Kütüphaneler — çevrim dışı çalışsın diye repoda
 │   ├── three.module.js
 │   ├── PointerLockControls.js   (özel düzeltmeli — aşağıya bak)
 │   └── BufferGeometryUtils.js
@@ -208,20 +206,9 @@ Her karakter 4×4 birimlik bir kare, duvarlar 5 birim yüksekliğinde.
 - **Sıfır bağımlılık, sıfır build adımı.** Three.js repoda gömülü, `importmap` ile çözülüyor. CDN'e ihtiyaç yok, tamamen çevrim dışı çalışıyor.
 - **Ses hataya dayanıklı:** `createSafeAudio()` her yüklemeyi `try/catch` ile sarıyor, eksik dosya oyunu çökertmiyor. `bottle_break.mp3` yoksa `scratch.mp3`'e düşüyor.
 - **Kayan çarpışma (sliding collision):** Duvara çapraz girince tamamen durmuyor — önce X, sonra Z ekseni ayrı deneniyor, hangisi boşsa o yönde kayıyor.
-- **`PointerLockControls.js` değiştirilmiş:** `onMouseMove` içine `if (!scope.enabled) return` eklenmiş, yoksa açılış sinematiği sırasında fare kamerayı oynatıyordu.
+- **`PointerLockControls.js` özelleştirilmiş:** `onMouseMove` içinde `enabled` kontrolü var — sinematikler sırasında kamerayı tamamen kilitlemeyi sağlıyor.
 - **Takılma kurtarma:** Entity 2 saniye boyunca 0,3 birimden az ilerlerse hedefe en yakın komşu kareye ışınlanıyor. Ping-pong'u önlemek için rastgele değil, hep hedefe doğru.
-- **`Object3D.lookAt` tuzağı:** Three.js'te kamera dışı nesnelerde `lookAt` yerel **+Z**'yi hedefe çevirir. Modelin yüzü +Z'de olduğu için ek `rotation.y += Math.PI` **gerekmez** — eskiden eklenen o flip yüzü ters çevirip Entity'nin oyuncuyu görememesine yol açıyordu. Ayrıntı: [`system.md`](system.md)
-
-## Bilinen Sorunlar
-
-| Sorun | Detay |
-|-------|-------|
-| `mazeLayout` iki yerde | `script.js` ve `entity_logic.js` aynı ızgarayı ayrı ayrı tutuyor — harita değişirse **ikisini birden** güncellemek gerekiyor |
-| `CHANGELOG.md` güncel değil | Sahte Entity mekaniğini ters anlatıyor; doğrusu kodda ve bu README'de |
-| Ölü kod | `#jumpscare-container` hiç tetiklenmiyor; `gameIntro.active` hiçbir zaman `true` olmuyor |
-| Kullanılmayan dosyalar | `heartbeat.mp3`, `page_turn.mp3`, `kapi_dokusu.jpg`, `kapı_dokusu2.jpg` hiçbir yerden referans edilmiyor |
-| Izgara satırları eşit değil | Satır uzunlukları 30–32 arasında değişiyor. Şu an zararsız (taşan alan duvarların arkasında, ulaşılamıyor) ama harita düzenlerken dikkat |
-| Görünmez Entity sesle belli oluyor | Tırmalama sesleri yaklaşık konumunu veriyor — *bu kasıtlı* |
+- **`Object3D.lookAt` tuzağı:** Three.js'te kamera dışı nesnelerde `lookAt` yerel **+Z**'yi hedefe çevirir — kameradakinin aksine. Entity modelinin yüzü ve ışığı +Z'de olduğu için düz `lookAt(oyuncu)` doğrudan doğru sonucu veriyor. Ayrıntı: [`system.md`](system.md)
 
 ---
 
@@ -293,8 +280,6 @@ WANDERING ──► DECTED ──5s of unbroken staring──► CHARGING ──
 ```
 
 **Important:** the Fake Entity **cannot kill you.** Worst case is GLITCH: five seconds orbiting you, screen distortion, a scream, then it's gone. The real danger is that while it charges, **the real Entity lunges the same way**, its light shifting orange-red. You get squeezed from both sides.
-
-> ⚠️ `CHANGELOG.md` describes this backwards (it claims the attack triggers when you look away). The code says otherwise: **looking is what triggers it.**
 
 ### 🔦 Flashlight and 🍾 Bottles
 
@@ -396,7 +381,7 @@ Each character is a 4×4-unit tile; walls are 5 units tall.
 ├── style.css           # UI and VHS/glitch effect layers
 ├── entity.html         # Observation room (separate tab)
 ├── entity_logic.js     # Monitor 3D view + radar
-├── js/                 # ⚠️ Libraries — vendored so the game works offline
+├── js/                 # Libraries — vendored so the game works offline
 │   ├── three.module.js
 │   ├── PointerLockControls.js   (locally patched — see below)
 │   └── BufferGeometryUtils.js
@@ -409,20 +394,9 @@ Each character is a 4×4-unit tile; walls are 5 units tall.
 - **Zero dependencies, zero build step.** Three.js is vendored and resolved through `importmap`. No CDN required; it runs fully offline.
 - **Fault-tolerant audio:** `createSafeAudio()` wraps every load in `try/catch`, so a missing file logs a warning instead of crashing the game. Missing `bottle_break.mp3` falls back to `scratch.mp3`.
 - **Sliding collision:** hitting a wall at an angle doesn't stop you dead — X and Z are tried separately, and you slide along whichever axis is clear.
-- **`PointerLockControls.js` is patched:** `if (!scope.enabled) return` was added to `onMouseMove`, otherwise the mouse moved the camera during the opening cinematic.
+- **`PointerLockControls.js` is customised:** `onMouseMove` honours an `enabled` flag, which is what lets the cinematics lock the camera completely.
 - **Stuck recovery:** if the Entity advances less than 0.3 units over 2 seconds, it teleports to the neighbouring tile closest to its target — always toward the goal rather than at random, to avoid ping-ponging.
-- **The `Object3D.lookAt` trap:** in Three.js, `lookAt` on a non-camera object points local **+Z** at the target. Since the model faces +Z, an extra `rotation.y += Math.PI` is **not needed** — that flip used to turn the face backwards and left the Entity unable to see the player. Details in [`system.md`](system.md).
-
-## Known Issues
-
-| Issue | Detail |
-|-------|--------|
-| `mazeLayout` exists twice | `script.js` and `entity_logic.js` each hold their own copy — changing the map means updating **both** |
-| `CHANGELOG.md` is stale | It describes the Fake Entity mechanic backwards; the code and this README are correct |
-| Dead code | `#jumpscare-container` is never triggered; `gameIntro.active` is never set to `true` |
-| Unused files | `heartbeat.mp3`, `page_turn.mp3`, `kapi_dokusu.jpg`, `kapı_dokusu2.jpg` are referenced nowhere |
-| Grid rows aren't equal length | Rows vary between 30 and 32 characters. Currently harmless (the overhang sits behind walls and is unreachable), but worth watching when editing the map |
-| The invisible Entity is audible | Scratching sounds leak its rough position — *this is intentional* |
+- **The `Object3D.lookAt` trap:** in Three.js, `lookAt` on a non-camera object points local **+Z** at the target — the opposite convention from a camera. The Entity's face and light both sit on +Z, so a plain `lookAt(player)` does exactly the right thing. Details in [`system.md`](system.md).
 
 ---
 
