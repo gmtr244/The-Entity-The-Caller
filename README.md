@@ -6,17 +6,21 @@
 *A first-person maze horror game built with Three.js, running entirely in the browser.*
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-![Three.js](https://img.shields.io/badge/Three.js-r1xx-000000?logo=three.js&logoColor=white)
+![Three.js](https://img.shields.io/badge/Three.js-vendored-000000?logo=three.js&logoColor=white)
 ![No Build Step](https://img.shields.io/badge/build-yok%20%2F%20none-success)
-![18+](https://img.shields.io/badge/18%2B-korku%20%2F%20horror-red)
+![Offline](https://img.shields.io/badge/offline-çalışır%20%2F%20works-brightgreen)
 
 **[🇹🇷 Türkçe](#-türkçe) · [🇬🇧 English](#-english)**
 
 </div>
 
 > [!WARNING]
-> **18+ · Yüksek korku içeriği.** Ani jumpscare'ler, yüksek sesler ve yanıp sönen ışık/glitch efektleri içerir. Işığa duyarlı epilepsisi olanlar oynamamalıdır.
-> **18+ · Intense horror content.** Contains sudden jumpscares, loud audio and flashing light/glitch effects. Not suitable for people with photosensitive epilepsy.
+> **Işığa duyarlılık uyarısı.** Entity yaklaştığında ekran saniyede ~5 kez titreşir ve renk kayması uygular. Işığa duyarlı epilepsisi olanlar için risklidir.
+> **Photosensitivity warning.** When the Entity closes in, the screen flickers ~5 times per second with a hue shift. This may be a risk for people with photosensitive epilepsy.
+
+> [!NOTE]
+> Atmosferik korku: karanlık, takip eden bir yaratık, çığlık sesleri. **Kan, şiddet görüntüsü veya jumpscare yok.**
+> Atmospheric horror: darkness, a stalking creature, scream sounds. **No blood, no depicted violence, no jumpscares.**
 
 ---
 
@@ -24,138 +28,200 @@
 
 ## Oyun Nedir?
 
-Karanlık bir labirentte uyanıyorsun. Elinde sadece bir fener var, ve labirentte yalnız değilsin.
+Karanlık bir labirentte uyanıyorsun. Elinde bir fener var ve yalnız değilsin.
 
-**Amacın:** Labirente dağılmış **8 anahtarı** topla ve çıkış kapısından kaç. Ama son anahtarı aldığın anda çıkış **mühürleniyor** — geri sayım başlıyor ve yeni bir yol bulmak zorunda kalıyorsun.
+**Amaç:** Labirente dağılmış **8 anahtarı** topla, çıkış kapısını bul, kaç.
 
-Seni avlayan şey öğrenen bir yapay zekâ. Ne kadar çok kaçarsan, seni o kadar iyi tanıyor.
+Ama son anahtarı aldığın anda oyun kurallarını değiştiriyor: **fenerin kalıcı olarak sönüyor**, koridorlar aydınlanıyor ve canavar çıkışın önünde donuyor. Çıkışa yaklaştığında kapı mühürlenip **duvara dönüşüyor**, labirentin başka bir yerinde yeni bir çıkış açılıyor ve **15 saniyelik geri sayım** başlıyor. Sayım bitince canavar çözülüyor — bu sefer %35 daha hızlı.
 
-## Öne Çıkan Sistemler
+## Nasıl Çalışır — Sistemler
 
-### 🧠 Entity — Öğrenen Avcı
+### 🧠 Entity: Öğrenen Avcı
 
-Entity, 6 durumlu bir **durum makinesi** ile çalışır ve labirentte **A\* pathfinding** ile yol bulur:
+Beş durumlu bir durum makinesi. Labirentte **A\*** ile yol buluyor (4 yönlü, Manhattan sezgisel, 350 iterasyon sınırı).
 
-| Durum | Tetikleyici | Davranış |
-|-------|-------------|----------|
-| `PATROLLING` | Varsayılan | Rastgele noktalarda devriye gezer, ışığı beyaz |
-| `HUNTING` | Seni gördü | Koşarak üstüne gelir, kolları öne uzanır, ışığı kırmızı |
-| `SEARCHING` | Seni kaybetti | Son gördüğü yere gider, kafasını sağa sola tarar, ışığı turuncu |
-| `AMBUSH` | Rastgele + yakın + sen bakmıyorken | Donar ve bekler — yaklaşınca saldırır |
-| `FROZEN` | 8 anahtar toplandı | Yerinde titrer, saldıramaz |
-| `STUNNED` | Feneri yüzüne tuttun | Kısa süre donar, gözleri maviye döner |
+| Durum | Tetikleyici | Davranış | Işık |
+|-------|-------------|----------|------|
+| `PATROLLING` | Varsayılan | Rastgele bir kareye yürür | Beyaz, sabit |
+| `HUNTING` | Seni gördü/hissetti | Üstüne koşar; kovaladıkça hızlanır | Kırmızı, titrek |
+| `SEARCHING` | Görüşü kaybetti | 3 aşamalı arama (aşağıda) | Turuncu |
+| `AMBUSH` | Yakın + sen bakmıyorken, rastgele | Görünmez olur, üstüne atılır | Yok (görünmez) |
+| `FROZEN` | 8 anahtar toplandı | Çıkışın önünde titreyerek bekler | — |
 
-**Altıncı his (`senseRadius`):** Görüş konisinin *dışında* bile olsan, ~7 metre içindeyse ve aranızda duvar yoksa seni **hisseder** ve döner. Arkasından sinsice geçmek işe yaramaz.
+Ayrıca **sersemleme (stun)** durumu var: ışık maviye döner, hareket edemez.
 
-**Adaptif hafıza:** Entity oyun boyunca seni profilleyip 0–10 arası bir *öğrenme skoru* biriktirir:
-- Gezdiğin bölgelerin **ısı haritasını** çıkarır
-- Son kaçış yönlerini hatırlar, **iz sürer**
-- Skor 2'yi geçince **gideceğin yeri tahmin edip önünü keser**
-- Ne kadar çok şişe fırlatırsan, **oltaya o kadar az gelir** (yem yoksayma şansı %65'e kadar çıkar)
+**Üç katmanlı algı** (`canEnemySeePlayer`):
+1. **Mesafe** — yürürken 20 birim, koşarken 35 birim
+2. **Görüş konisi** — `dot > 0.3` (~145°). Koninin dışında kalsan bile **altıncı his**: 7 birim içindeysen ve aranızda duvar yoksa seni hisseder, döner. *Arkasından sinsice geçmek işe yaramıyor.*
+3. **Raycast** — arada duvar veya kapalı kapı var mı
 
-### 👻 Sahte Entity (Halüsinasyon)
+Çömelmek her iki yarıçapı da **×0,6** yapıyor. Koşmak sezgi mesafesini +4 büyütüyor.
 
-Gerçek Entity'nin yanında bir de **yarı saydam, yeşil ışıklı, süzülen** bir sahtesi var. Weeping Angel mantığıyla çalışır:
+**3 aşamalı arama:** Görüşü kaybedince önce seni son gördüğü yere gider; 4 saniyede bulamazsa kaçış yönünde **+5 birim** ileriye, sonra **+10 birim** ileriye bakar. "O tarafa gitti, şuraya da bakayım" davranışı.
+
+### 📈 Adaptif Hafıza — Seni Öğreniyor
+
+Entity her avdan sonra bir **öğrenme skoru** biriktiriyor (`floor(avSayısı / 1,5)`, en fazla 10). Skor arttıkça:
+
+| Etki | Formül |
+|------|--------|
+| Algılama yarıçapı büyür | +0,5 birim / puan |
+| Köşeye saklanınca daha ısrarcı | +0,1 sn / puan (1,2 → 2,2 sn) |
+| Devriyede en çok gezdiğin bölgeye gider | +%7 ihtimal / puan (max %70) |
+| Sahte Entity daha sık gelir | bekleme −1,5 sn / puan |
+| **Önünü keser** | skor ≥ 2'den itibaren |
+
+Ayrıca **alışkanlığını** öğreniyor: karelerin %25'inden fazlasında koştuysan, koşarken algılama yarıçapına **+6** ekleniyor. Ve **anahtar başına %7 hızlanıyor** — 8 anahtarla yaklaşık %56 daha hızlı.
+
+Arka planda bir **ısı haritası** (1,5 sn'de bir hangi karede olduğun) ve **son 30 pozisyonun** (0,3 sn aralıkla) tutuluyor. Önünü kesme bu geçmişten hızını çıkarıp 2,8 kat ileriye projeksiyon yaparak çalışıyor.
+
+### 👁️ İki Farklı "Bakma" Mekaniği
+
+Oyunun en ilginç yanı: bakmak bir tehdide karşı seni **koruyor**, diğerine karşı **öldürüyor**.
+
+**AMBUSH — klasik weeping angel.** Entity görünmez olur ve donar. **Baktığın sürece hareket edemez.** Bakışını çevirdiğin an normal av hızının **2,3 katıyla** üstüne atılır. 3 birime yaklaşırsa aniden görünür olup saldırıya geçer. 9 saniyede yakalayamazsa pusu bozulur, 90 saniye bekler.
+
+**Sahte Entity — tam tersi.** Yarı saydam, yeşil ışıklı, yerden 1,6 birim yukarıda süzülüyor. **Ona 5 saniye kesintisiz bakarsan** üstüne uçmaya başlıyor. Bakışını çevirirsen kaçırıyorsun — ışınlanıp gidiyor.
 
 ```
-WANDERING  →  DECTED  →  CHARGING  →  GLITCH  →  kaybolur
- (dolaşır)   (bakınca   (bakmayı     (5 sn ekran
-              DONAR)     bırakınca    glitch'i +
-                         üstüne uçar) etrafında döner)
+WANDERING ──► DECTED ──5 sn kesintisiz bakış──► CHARGING ──► GLITCH ──► kaybolur
+(A* ile      (bakınca                          (13,5 hız,   (5 sn,
+ dolaşır)     donar)                            bakınca      etrafında
+                │                                DECTED'e     döner)
+                └──bakışı kesersen──► ışınlanır   döner)
 ```
 
-Ve en kötüsü: sahte Entity sana doğru uçarken gerçek Entity de aynı yöne hamle yapar — **iki taraftan birden** sıkışırsın. Bu kombo aktifken ışığı turuncu-kırmızıya döner.
+**Önemli:** Sahte Entity seni **öldüremiyor.** En kötü ihtimalle GLITCH: 5 saniye etrafında dönüyor, ekran bozuluyor, çığlık çalıyor, sonra kayboluyor. Gerçek tehlike şu: sahte Entity üstüne uçarken **gerçek Entity de aynı yöne hamle yapıyor** ve ışığı turuncu-kırmızıya dönüyor. İki taraftan sıkışıyorsun.
 
-### 🔦 Fener ve Şişeler
+> ⚠️ `CHANGELOG.md` bu mekanizmayı ters anlatıyor (bakmayı bırakınca saldırdığını söylüyor). Kodda doğrusu yukarıdaki: **bakmak tetikliyor.**
 
-- **Fener (F):** Entity'nin yüzüne tutarsan onu sersemletirsin — ama şarj çubuğu dolana kadar tutman gerekir
-- **Şişeler (G):** Yerden topla, uzağa fırlat, sesle Entity'yi başka yöne çek. Ama abartma — öğreniyor
+### 🔦 Fener ve 🍾 Şişeler
+
+**Fener:** Entity'ye bakarken `F` tuşunu **basılı tut** — dairesel bir çubuk dolar. 2 saniyede dolunca Entity 3,5 saniye sersemler. Ama her kullanımda gereken süre **+0,5 saniye artıyor**, yani ikinci sefer 2,5 sn, üçüncü 3 sn... Sınırsız kullanılamıyor.
+
+**Şişeler:** Haritada duvar diplerine **rastgele 4 tane** dağılıyor. İki işe yarıyor:
+- **Yere düşüp kırılınca** ses çıkarıp Entity'yi oraya çekiyor — ama her attığında %10 daha az kanıyor (**en fazla %65 yoksayma**)
+- **Doğrudan çarparsan** Entity'yi **6 saniye** sersemletiyor *(sadece görünürken)*
+
+### 👻 Görünürlük Döngüsü
+
+Entity sürekli görünür değil. **60 saniye görünür**, sonra kayboluyor ve **25 saniye görünmez** kalıyor. Görünmezken:
+
+- Daha yavaş (2,0 birim/sn) ama **kapılardan geçebiliyor**
+- **Sana zarar veremiyor** ve ışınlanamıyor
+- Yakınlığa göre tırmalama sesi çalıyor — 8 birim içindeyse her 2–3,5 sn'de, 15 birim içindeyse 4–7 sn'de bir *(kasıtlı: yaklaşık konumunu ele veriyor)*
+- Görünür olmadan ~3 saniye önce bir kıkırdama duyuyorsun — "bir şey geliyor" uyarısı
+
+Bir de **yönetmen AI'ı** var: (25 − anahtar×2) saniyedir karşılaşma olmadıysa Entity'yi zorla yanına ışınlıyor. Yani sakinlik uzun sürmüyor.
+
+### 🎬 Sinematikler
+
+**Açılış (~20 sn, atlanamaz):** Dört satır metin — *"Gözlerini açtığında buradaydın."* → karanlıkta sağa-sola bakış → fenerin çakıp sönmesi → 180° arkanı dönüş → Entity 16 birim ötede belirip üstüne koşar → 3,5 birime gelince kaybolur. Bu sırada fare ve klavye tamamen kilitli.
+
+**Kazanma:** Canvas üzerine çizilen bir orman sahnesi — 55 ağaç 5 saniyede büyüyor ve rüzgârda sallanıyor, soğuk bir ay yükseliyor, 10 ateşböceği süzülüyor. Sonra harf harf yazılan *"Kabus sona erdi... şimdilik."*
+
+**Ölüm:** Karartma → çığlık → 12 metinden rastgele biri. Yarısı sıradan itiraflar, yarısı bilerek anlaşılmaz:
+> *"Anahtarları saydın. O da saydı. Ama o farklı şeyler sayıyordu."*
 
 ### 📺 Entity Monitor — Gözlem Odası
 
-`entity.html` ayrı bir sekmede açılan **CRT/yeşil fosfor tarzı gözlem ekranı**. `BroadcastChannel` üzerinden canlı telemetri alır: labirent radarı, Entity'nin anlık durumu, sahte Entity'nin durumu ve konumu. Oyunu ikinci bir ekranda izlemek için.
+`entity.html`, ikinci bir sekmede açılan yeşil fosfor / CRT tarzı gözlem ekranı. Oyun sekmesinden `BroadcastChannel('telemetry-hub')` üzerinden canlı veri alıyor: Entity'nin konumu, durumu, boyun ve kol açıları, ışık rengi; oyuncunun konumu, staminası, feneri; kapıların açık/kapalı durumu; kalan anahtarların koordinatları; çıkış kapısının yeri. Altta 2B radar, üstte durum paneli.
 
-### 🎬 Ayrıca
+İki sekme aynı tarayıcıda açık olmalı — `BroadcastChannel` ağ üzerinden çalışmaz.
 
-- **Sinematik intro:** Karanlıkta uyanma, sönen fener, arkanda beliren Entity
-- **Stamina sistemi:** Koşarken tükenir, tükenince nefes nefese kalırsın
-- **Çömelme:** Daha sessiz ama daha yavaş — Entity'nin algı yarıçapı %40 düşer
-- **Ruh sağlığı vinyeti**, VHS glitch efektleri, dinamik müzik geçişleri
+### 🏆 Başarımlar
+
+Oyun `window.parent.postMessage` ile üç başarım gönderiyor: **ilk ölüm**, **kaçış**, ve **5 dakikanın altında kaçış**. Bu bir portal sayfasına `<iframe>` ile gömülmek için tasarlanmış — tek başına açıldığında mesajlar sessizce yok sayılıyor, oyun normal çalışıyor.
 
 ## Kontroller
 
 | Tuş | İşlev |
 |-----|-------|
 | `W` `A` `S` `D` | Hareket |
-| `Shift` | Koş (stamina harcar) |
-| `C` | Çömel |
+| `Shift` | Koş — stamina harcar, sesin Entity'ye daha uzaktan ulaşır |
+| `C` | Çömel — sessiz ve daha az fark edilir, ama yavaş |
 | `Space` | Zıpla |
-| `E` | Etkileşim (kapı aç, anahtar/şişe al) |
-| `F` | Fener aç/kapa · Entity'ye tutunca sersemletir |
-| `G` | Nişan al (basılı tut) → bırak: fırlat |
-| `1` `2` `3` | Envanter slotu seç |
-| `Esc` | Duraklat |
+| `E` | Etkileşim — kapı aç/kapa, şişe al, çıkıştan kaç |
+| `F` | Fener aç/kapa · Entity'ye **basılı tutunca** sersemletir |
+| `G` | **Basılı tut** nişan al, **bırak** fırlat |
+| `1` `2` `3` | Envanter slotu (3 slot) |
+| `Esc` | Duraklat *(imleç kilidini bırakır)* |
+
+**Ölüm koşulu:** Entity görünürken, sersemlememişken ve sana 1,5 birimden yakınken.
 
 ## Nasıl Çalıştırılır?
 
-Oyun ES modülleri kullandığı için **`index.html`'i çift tıklayarak açmak çalışmaz** — yerel bir HTTP sunucusu gerekir.
+Oyun ES modülleri kullanıyor, bu yüzden **`index.html`'i çift tıklamak çalışmaz** (tarayıcı `file://` üzerinden modül yüklemeyi engeller). Yerel bir HTTP sunucusu gerekiyor:
 
 ```bash
 git clone https://github.com/gmtr244/The-Entity-The-Caller.git
 cd The-Entity-The-Caller
-
-# Python ile (en kolay)
 python3 -m http.server 8000
 ```
 
-Sonra tarayıcıdan **http://localhost:8000** adresine git.
-
-Gözlem ekranı için ikinci bir sekmede: **http://localhost:8000/entity.html**
+Tarayıcıdan **http://localhost:8000** · gözlem ekranı için ikinci sekmede **http://localhost:8000/entity.html**
 
 <details>
-<summary>Alternatif sunucular</summary>
+<summary>Alternatifler</summary>
 
 ```bash
-npx serve          # Node.js
-php -S localhost:8000   # PHP
+npx serve
+php -S localhost:8000
 ```
-VS Code kullanıyorsan **Live Server** eklentisi de yeterli.
+VS Code'da **Live Server** eklentisi de olur.
 </details>
 
-**Gereken:** WebGL destekleyen güncel bir tarayıcı (Chrome / Firefox / Edge). Fare kilidi (Pointer Lock) için oyuna tıklaman gerekir.
+**Gerekenler:** WebGL destekleyen güncel bir tarayıcı. İnternet gerekmiyor — Three.js dahil her şey repoda. Fare kilidi için oyuna bir kez tıklaman gerekiyor.
+
+## Labirent
+
+Prosedürel değil — `script.js` içinde **elle yazılmış 19 satırlık bir karakter ızgarası**. Her oyunda aynı harita.
+
+```
+W = duvar     D = kapı (10 adet)      K = anahtar (8 adet)
+P = oyuncu    E = Entity başlangıcı   X = çıkış kapısı (kilitli)
+```
+
+Her karakter 4×4 birimlik bir kare, duvarlar 5 birim yüksekliğinde.
+
+**Her oyunda değişenler:** Entity'nin açılış konumu, 4 şişenin yeri, Sahte Entity'nin çıktığı nokta, ışınlanma hedefleri, ve mühürlemeden sonra yeni çıkışın açılacağı kapı.
 
 ## Proje Yapısı
 
 ```
-├── index.html          # Oyun giriş noktası (menü + HUD + importmap)
-├── script.js           # Ana oyun motoru (~2950 satır)
-├── entity_logic.js     # Monitor ekranı mantığı + radar
+├── index.html          # Oyun — menü, HUD, importmap
+├── script.js           # Oyun motoru (~2950 satır)
+├── sounds.js           # Ses yükleme ve durum yönetimi
+├── style.css           # Arayüz, VHS/glitch efekt katmanları
 ├── entity.html         # Gözlem odası (ayrı sekme)
-├── sounds.js           # Merkezî ses yönetimi
-├── style.css           # Tüm arayüz ve efekt katmanları
-├── js/
-│   ├── three.module.js         # Three.js (gömülü, CDN'e bağımlılık yok)
-│   ├── PointerLockControls.js  # Fare kilidi (özel düzeltmeli)
+├── entity_logic.js     # Monitor 3B görünüm + radar
+├── js/                 # ⚠️ Kütüphaneler — çevrim dışı çalışsın diye repoda
+│   ├── three.module.js
+│   ├── PointerLockControls.js   (özel düzeltmeli — aşağıya bak)
 │   └── BufferGeometryUtils.js
-├── system.md           # Entity AI teknik dokümantasyonu
-├── CHANGELOG.md        # Sürüm değişiklik günlüğü
-└── *.mp3 / *.webp      # Ses ve doku dosyaları
+├── system.md           # Entity AI teknik notları
+└── CHANGELOG.md        # Sürüm günlüğü
 ```
 
 ## Teknik Notlar
 
-- **Bağımlılık yok, build adımı yok.** Three.js repoya gömülü, `importmap` ile çözülüyor
-- Duvarlar `BufferGeometryUtils` ile **tek mesh'te birleştiriliyor** (draw call optimizasyonu)
-- Pathfinding 2D grid üzerinde A\*, düzleştirilmiş waypoint listesi döndürüyor
-- Ses dosyaları `createSafeAudio()` ile yükleniyor — eksik dosya oyunu çökertmiyor, uyarı verip geçiyor
-- Entity ↔ Monitor haberleşmesi `BroadcastChannel('telemetry-hub')` üzerinden
-
-Entity AI'nın satır satır dökümü için **[`system.md`](system.md)**, sürüm geçmişi için **[`CHANGELOG.md`](CHANGELOG.md)** dosyalarına bak.
+- **Sıfır bağımlılık, sıfır build adımı.** Three.js repoda gömülü, `importmap` ile çözülüyor. CDN'e ihtiyaç yok, tamamen çevrim dışı çalışıyor.
+- **Ses hataya dayanıklı:** `createSafeAudio()` her yüklemeyi `try/catch` ile sarıyor, eksik dosya oyunu çökertmiyor. `bottle_break.mp3` yoksa `scratch.mp3`'e düşüyor.
+- **Kayan çarpışma (sliding collision):** Duvara çapraz girince tamamen durmuyor — önce X, sonra Z ekseni ayrı deneniyor, hangisi boşsa o yönde kayıyor.
+- **`PointerLockControls.js` değiştirilmiş:** `onMouseMove` içine `if (!scope.enabled) return` eklenmiş, yoksa açılış sinematiği sırasında fare kamerayı oynatıyordu.
+- **Takılma kurtarma:** Entity 2 saniye boyunca 0,3 birimden az ilerlerse hedefe en yakın komşu kareye ışınlanıyor. Ping-pong'u önlemek için rastgele değil, hep hedefe doğru.
+- **`Object3D.lookAt` tuzağı:** Three.js'te kamera dışı nesnelerde `lookAt` yerel **+Z**'yi hedefe çevirir. Modelin yüzü +Z'de olduğu için ek `rotation.y += Math.PI` **gerekmez** — eskiden eklenen o flip yüzü ters çevirip Entity'nin oyuncuyu görememesine yol açıyordu. Ayrıntı: [`system.md`](system.md)
 
 ## Bilinen Sorunlar
 
-- Entity görünmezken bile scratch/proximity sesleri yaklaşık konumunu ele veriyor *(bilinçli tasarım)*
-- `gameIntro.active` bloğu eski koddan kalma, hiç tetiklenmiyor — zararsız ama temizlenebilir
+| Sorun | Detay |
+|-------|-------|
+| `mazeLayout` iki yerde | `script.js` ve `entity_logic.js` aynı ızgarayı ayrı ayrı tutuyor — harita değişirse **ikisini birden** güncellemek gerekiyor |
+| `CHANGELOG.md` güncel değil | Sahte Entity mekaniğini ters anlatıyor; doğrusu kodda ve bu README'de |
+| Ölü kod | `#jumpscare-container` hiç tetiklenmiyor; `gameIntro.active` hiçbir zaman `true` olmuyor |
+| Kullanılmayan dosyalar | `heartbeat.mp3`, `page_turn.mp3`, `kapi_dokusu.jpg`, `kapı_dokusu2.jpg` hiçbir yerden referans edilmiyor |
+| Izgara satırları eşit değil | Satır uzunlukları 30–32 arasında değişiyor. Şu an zararsız (taşan alan duvarların arkasında, ulaşılamıyor) ama harita düzenlerken dikkat |
+| Görünmez Entity sesle belli oluyor | Tırmalama sesleri yaklaşık konumunu veriyor — *bu kasıtlı* |
 
 ---
 
@@ -165,146 +231,204 @@ Entity AI'nın satır satır dökümü için **[`system.md`](system.md)**, sür�
 
 You wake up in a dark maze. You have a flashlight, and you are not alone.
 
-**Your goal:** collect the **8 keys** scattered across the maze and escape through the exit door. But the moment you pick up the last key, the exit gets **sealed** — a countdown starts and you have to find another way out.
+**The goal:** collect the **8 keys** scattered through the maze, find the exit, escape.
 
-The thing hunting you is a learning AI. The more you run, the better it knows you.
+But the moment you grab the last key the game changes its rules: **your flashlight dies permanently**, the corridors light up, and the creature freezes in front of the exit. When you approach that exit it gets sealed and **turns into a wall**, a new exit opens elsewhere in the maze, and a **15-second countdown** starts. When it hits zero the creature unfreezes — 35% faster this time.
 
-## Core Systems
+## How It Works — Systems
 
-### 🧠 The Entity — A Hunter That Learns
+### 🧠 The Entity: A Hunter That Learns
 
-The Entity runs on a 6-state **state machine** and navigates the maze with **A\* pathfinding**:
+A five-state machine navigating the maze with **A\*** (4-directional, Manhattan heuristic, capped at 350 iterations).
 
-| State | Trigger | Behaviour |
-|-------|---------|-----------|
-| `PATROLLING` | Default | Wanders to random points, white light |
-| `HUNTING` | It saw you | Charges at you, arms reaching forward, red light |
-| `SEARCHING` | It lost you | Goes to your last known position, scans left-right, orange light |
-| `AMBUSH` | Random + nearby + you're not looking | Freezes and waits — strikes when you get close |
-| `FROZEN` | All 8 keys collected | Trembles in place, cannot attack |
-| `STUNNED` | You shone the flashlight in its face | Freezes briefly, eyes turn blue |
+| State | Trigger | Behaviour | Light |
+|-------|---------|-----------|-------|
+| `PATROLLING` | Default | Walks to a random tile | White, steady |
+| `HUNTING` | Saw or sensed you | Charges you, accelerating the longer it chases | Red, flickering |
+| `SEARCHING` | Lost line of sight | Three-stage search (below) | Orange |
+| `AMBUSH` | Nearby + you're not looking, at random | Goes invisible, then lunges | None (invisible) |
+| `FROZEN` | All 8 keys collected | Trembles in front of the exit | — |
 
-**Sixth sense (`senseRadius`):** even *outside* its vision cone, if you're within ~7 metres with no wall between you, it **senses** you and turns around. Sneaking up behind it does not work.
+There's also a **stunned** condition: the light turns blue and it can't move.
 
-**Adaptive memory:** the Entity profiles you during the run and builds a *learning score* from 0 to 10:
-- Builds a **heatmap** of the areas you frequent
-- Remembers your recent escape directions and **follows your trail**
-- Past score 2, it **predicts where you're heading and cuts you off**
-- The more bottles you throw, the **less it takes the bait** (ignore chance climbs to 65%)
+**Three-layer perception** (`canEnemySeePlayer`):
+1. **Distance** — 20 units while you walk, 35 while you sprint
+2. **Vision cone** — `dot > 0.3` (~145°). Even outside the cone, a **sixth sense** kicks in: within 7 units with no wall between you, it senses you and turns. *Sneaking up behind it does not work.*
+3. **Raycast** — is there a wall or closed door in between
 
-### 👻 The Fake Entity (Hallucination)
+Crouching multiplies both radii by **0.6**. Sprinting adds +4 to the sense radius.
 
-Alongside the real one there's a **translucent, green-lit, floating** impostor. It works on Weeping Angel logic:
+**Three-stage search:** on losing you it first goes to where it last saw you; if that fails after 4 seconds it checks **+5 units** along your escape direction, then **+10 units**. A "you went that way, let me check further" behaviour.
+
+### 📈 Adaptive Memory — It Learns You
+
+The Entity accumulates a **learning score** after each hunt (`floor(huntCount / 1.5)`, capped at 10). As it climbs:
+
+| Effect | Formula |
+|--------|---------|
+| Detection radius grows | +0.5 units / point |
+| More persistent when you break line of sight | +0.1 s / point (1.2 → 2.2 s) |
+| Patrols toward your most-visited area | +7% chance / point (max 70%) |
+| The Fake Entity returns sooner | −1.5 s wait / point |
+| **Cuts you off** | from score ≥ 2 onward |
+
+It also learns your **habits**: if you sprinted for more than 25% of frames, its sprint detection radius gains **+6**. And it gets **7% faster per key you collect** — roughly 56% faster with all eight.
+
+Behind this sits a **heatmap** (which tile you're on, sampled every 1.5 s) and your **last 30 positions** (every 0.3 s). Interception works by deriving your velocity from that history and projecting 2.8× ahead.
+
+### 👁️ Two Opposite "Looking" Mechanics
+
+The most interesting thing in the game: looking **protects** you from one threat and **kills** you against the other.
+
+**AMBUSH — the classic weeping angel.** The Entity goes invisible and freezes. **It cannot move while you look at it.** The instant you look away it lunges at **2.3× its hunt speed**. Within 3 units it snaps visible and attacks. If it hasn't caught you in 9 seconds the ambush breaks, and it waits 90 seconds before trying again.
+
+**The Fake Entity — the exact inverse.** Translucent, green-lit, hovering 1.6 units off the floor. **Look at it for 5 uninterrupted seconds** and it starts flying at you. Look away and you've escaped it — it teleports off.
 
 ```
-WANDERING  →  DECTED  →  CHARGING  →  GLITCH  →  vanishes
- (roams)     (FREEZES   (flies at    (5s of screen
-              when you   you the      glitch while
-              look)      moment you   orbiting you)
-                         look away)
+WANDERING ──► DECTED ──5s of unbroken staring──► CHARGING ──► GLITCH ──► vanishes
+(roams        (freezes                          (speed 13.5,  (5s orbit
+ via A*)       when you                          back to       around you)
+                │  look)                          DECTED if
+                └──look away──► teleports away     you look)
 ```
 
-And the worst part: while the fake one charges you, the real Entity lunges in the same direction — you get **squeezed from both sides**. Its light turns orange-red when this combo is active.
+**Important:** the Fake Entity **cannot kill you.** Worst case is GLITCH: five seconds orbiting you, screen distortion, a scream, then it's gone. The real danger is that while it charges, **the real Entity lunges the same way**, its light shifting orange-red. You get squeezed from both sides.
 
-### 🔦 Flashlight and Bottles
+> ⚠️ `CHANGELOG.md` describes this backwards (it claims the attack triggers when you look away). The code says otherwise: **looking is what triggers it.**
 
-- **Flashlight (F):** hold it on the Entity's face to stun it — but you have to hold until the charge bar fills
-- **Bottles (G):** pick them up, throw them far, lure the Entity away with the noise. Don't overdo it — it's learning
+### 🔦 Flashlight and 🍾 Bottles
+
+**Flashlight:** **hold** `F` while looking at the Entity — a radial bar fills. At 2 seconds it stuns the Entity for 3.5 seconds. But each use raises the required hold by **+0.5 seconds** (2.5s the second time, 3s the third…), so it can't be spammed.
+
+**Bottles:** **four** are scattered at random against the walls. They do two jobs:
+- **Shattering on the ground** pulls the Entity toward the noise — but every throw makes it 10% less gullible (**capped at 65% ignored**)
+- **A direct hit** stuns the Entity for **6 seconds** *(only while it's visible)*
+
+### 👻 The Visibility Cycle
+
+The Entity isn't always there. It stays **visible for 60 seconds**, then disappears for **25 seconds**. While invisible it:
+
+- Moves slower (2.0 units/s) but **passes through doors**
+- **Cannot hurt you** and cannot teleport
+- Plays scratching sounds by proximity — every 2–3.5 s within 8 units, every 4–7 s within 15 *(deliberate: it leaks its rough position)*
+- Gives a giggle about 3 seconds before reappearing — a "something's coming" tell
+
+There's also a **director AI**: if (25 − keys×2) seconds pass without an encounter, it force-teleports the Entity near you. Quiet stretches don't last.
+
+### 🎬 Cinematics
+
+**Opening (~20s, not skippable):** four lines of text — *"You were already here when you opened your eyes."* → looking left and right in the dark → the flashlight sputtering and dying → turning 180° → the Entity appearing 16 units away and running at you → vanishing at 3.5 units. Mouse and keyboard are fully locked throughout.
+
+**Winning:** a forest scene drawn on canvas — 55 trees growing over 5 seconds and swaying in the wind, a cold moon rising, 10 fireflies drifting. Then, typed out character by character: *"The nightmare is over... for now."*
+
+**Dying:** fade to black → scream → one of 12 lines at random. Half are ordinary confessions, half are deliberately opaque:
+> *"You counted the keys. So did it. But it was counting different things."*
 
 ### 📺 Entity Monitor — The Observation Room
 
-`entity.html` is a separate **CRT / green phosphor observation screen** you open in another tab. It receives live telemetry over `BroadcastChannel`: a maze radar, the Entity's current state, and the fake Entity's state and position. Made for watching the run on a second screen.
+`entity.html` is a green-phosphor CRT-style observation screen you open in a second tab. It receives live data from the game tab over `BroadcastChannel('telemetry-hub')`: the Entity's position, state, neck and arm angles, light colour; your position, stamina and flashlight; every door's open/closed state; the coordinates of the remaining keys; the exit's location. A 2D radar sits at the bottom, a status panel at the top.
 
-### 🎬 Also Included
+Both tabs must be in the same browser — `BroadcastChannel` does not cross the network.
 
-- **Cinematic intro:** waking in the dark, the flashlight dying, the Entity appearing behind you
-- **Stamina system:** drains as you sprint, leaves you winded when empty
-- **Crouching:** quieter but slower — drops the Entity's detection radius by 40%
-- **Sanity vignette**, VHS glitch effects, dynamic music transitions
+### 🏆 Achievements
+
+The game emits three achievements via `window.parent.postMessage`: **first death**, **escape**, and **escape under 5 minutes**. This is built to be embedded in a portal page via `<iframe>` — opened standalone the messages are silently ignored and the game runs normally.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
 | `W` `A` `S` `D` | Move |
-| `Shift` | Sprint (drains stamina) |
-| `C` | Crouch |
+| `Shift` | Sprint — drains stamina, and carries your sound further to the Entity |
+| `C` | Crouch — quiet and harder to detect, but slow |
 | `Space` | Jump |
-| `E` | Interact (open doors, pick up keys/bottles) |
-| `F` | Toggle flashlight · stuns the Entity when held on it |
-| `G` | Hold to aim → release to throw |
-| `1` `2` `3` | Select inventory slot |
-| `Esc` | Pause |
+| `E` | Interact — open/close doors, pick up bottles, escape through the exit |
+| `F` | Toggle flashlight · **hold** on the Entity to stun it |
+| `G` | **Hold** to aim, **release** to throw |
+| `1` `2` `3` | Inventory slot (3 slots) |
+| `Esc` | Pause *(releases pointer lock)* |
+
+**Death condition:** the Entity is visible, not stunned, and within 1.5 units of you.
 
 ## Running It
 
-The game uses ES modules, so **double-clicking `index.html` will not work** — you need a local HTTP server.
+The game uses ES modules, so **double-clicking `index.html` won't work** (browsers block module loading over `file://`). You need a local HTTP server:
 
 ```bash
 git clone https://github.com/gmtr244/The-Entity-The-Caller.git
 cd The-Entity-The-Caller
-
-# With Python (easiest)
 python3 -m http.server 8000
 ```
 
-Then open **http://localhost:8000** in your browser.
-
-For the observation screen, open a second tab at **http://localhost:8000/entity.html**
+Open **http://localhost:8000** · and for the observation screen, a second tab at **http://localhost:8000/entity.html**
 
 <details>
-<summary>Alternative servers</summary>
+<summary>Alternatives</summary>
 
 ```bash
-npx serve          # Node.js
-php -S localhost:8000   # PHP
+npx serve
+php -S localhost:8000
 ```
 The VS Code **Live Server** extension works too.
 </details>
 
-**Requirements:** a modern WebGL-capable browser (Chrome / Firefox / Edge). You need to click into the game to engage Pointer Lock.
+**Requirements:** a modern WebGL-capable browser. No internet needed — everything including Three.js is in the repo. Click into the game once to engage pointer lock.
+
+## The Maze
+
+Not procedural — a **hand-authored 19-row character grid** inside `script.js`. Same map every run.
+
+```
+W = wall      D = door (10)          K = key (8)
+P = player    E = Entity spawn       X = exit door (locked)
+```
+
+Each character is a 4×4-unit tile; walls are 5 units tall.
+
+**What does change per run:** the Entity's opening position, where the 4 bottles land, where the Fake Entity spawns, teleport destinations, and which door becomes the new exit after the seal.
 
 ## Project Structure
 
 ```
-├── index.html          # Game entry point (menu + HUD + importmap)
-├── script.js           # Main game engine (~2950 lines)
-├── entity_logic.js     # Monitor screen logic + radar
+├── index.html          # Game — menu, HUD, importmap
+├── script.js           # Game engine (~2950 lines)
+├── sounds.js           # Audio loading and state
+├── style.css           # UI and VHS/glitch effect layers
 ├── entity.html         # Observation room (separate tab)
-├── sounds.js           # Centralised audio management
-├── style.css           # All UI and effect layers
-├── js/
-│   ├── three.module.js         # Three.js (vendored, no CDN dependency)
-│   ├── PointerLockControls.js  # Pointer lock (with custom fix)
+├── entity_logic.js     # Monitor 3D view + radar
+├── js/                 # ⚠️ Libraries — vendored so the game works offline
+│   ├── three.module.js
+│   ├── PointerLockControls.js   (locally patched — see below)
 │   └── BufferGeometryUtils.js
-├── system.md           # Entity AI technical documentation
-├── CHANGELOG.md        # Version changelog
-└── *.mp3 / *.webp      # Audio and texture assets
+├── system.md           # Entity AI technical notes (Turkish)
+└── CHANGELOG.md        # Version log (Turkish)
 ```
 
 ## Technical Notes
 
-- **No dependencies, no build step.** Three.js is vendored in the repo and resolved via `importmap`
-- Walls are **merged into a single mesh** with `BufferGeometryUtils` (draw-call optimisation)
-- Pathfinding is A\* on a 2D grid, returning a smoothed waypoint list
-- Audio loads through `createSafeAudio()` — a missing file logs a warning instead of crashing the game
-- Entity ↔ Monitor communication runs over `BroadcastChannel('telemetry-hub')`
-
-See **[`system.md`](system.md)** for a line-by-line breakdown of the Entity AI, and **[`CHANGELOG.md`](CHANGELOG.md)** for version history. *(Both documents are written in Turkish.)*
+- **Zero dependencies, zero build step.** Three.js is vendored and resolved through `importmap`. No CDN required; it runs fully offline.
+- **Fault-tolerant audio:** `createSafeAudio()` wraps every load in `try/catch`, so a missing file logs a warning instead of crashing the game. Missing `bottle_break.mp3` falls back to `scratch.mp3`.
+- **Sliding collision:** hitting a wall at an angle doesn't stop you dead — X and Z are tried separately, and you slide along whichever axis is clear.
+- **`PointerLockControls.js` is patched:** `if (!scope.enabled) return` was added to `onMouseMove`, otherwise the mouse moved the camera during the opening cinematic.
+- **Stuck recovery:** if the Entity advances less than 0.3 units over 2 seconds, it teleports to the neighbouring tile closest to its target — always toward the goal rather than at random, to avoid ping-ponging.
+- **The `Object3D.lookAt` trap:** in Three.js, `lookAt` on a non-camera object points local **+Z** at the target. Since the model faces +Z, an extra `rotation.y += Math.PI` is **not needed** — that flip used to turn the face backwards and left the Entity unable to see the player. Details in [`system.md`](system.md).
 
 ## Known Issues
 
-- Scratch/proximity sounds still hint at the Entity's rough position while it's invisible *(intentional design)*
-- The `gameIntro.active` block is leftover code that never triggers — harmless, but could be cleaned up
+| Issue | Detail |
+|-------|--------|
+| `mazeLayout` exists twice | `script.js` and `entity_logic.js` each hold their own copy — changing the map means updating **both** |
+| `CHANGELOG.md` is stale | It describes the Fake Entity mechanic backwards; the code and this README are correct |
+| Dead code | `#jumpscare-container` is never triggered; `gameIntro.active` is never set to `true` |
+| Unused files | `heartbeat.mp3`, `page_turn.mp3`, `kapi_dokusu.jpg`, `kapı_dokusu2.jpg` are referenced nowhere |
+| Grid rows aren't equal length | Rows vary between 30 and 32 characters. Currently harmless (the overhang sits behind walls and is unreachable), but worth watching when editing the map |
+| The invisible Entity is audible | Scratching sounds leak its rough position — *this is intentional* |
 
 ---
 
 ## 📄 Lisans / License
 
-Bu proje **GNU Affero General Public License v3.0** ile lisanslanmıştır.
-This project is licensed under the **GNU Affero General Public License v3.0**.
-
-Ayrıntılar için [`LICENSE`](LICENSE) dosyasına bakın. / See [`LICENSE`](LICENSE) for details.
+**GNU Affero General Public License v3.0** — bkz. / see [`LICENSE`](LICENSE).
 
 <div align="center">
 <sub>© 2026 — Entities Project · <a href="https://github.com/gmtr244">gmtr244</a></sub>
